@@ -163,5 +163,13 @@ journalctl --user -u cc-connect -f      # 等到 "telegram: connected"、"platfo
 - **upstream 死結（未回報）**：`agent/claudecode/claude_usage.go` 主迴圈若先讀走 `readDone`，
   defer 裡的 `<-readDone` 會永久阻塞 → `/usage` 無回覆、暫存目錄殘留。
   目前靠 §4、§5 讓 probe 不走到這條路；Claude Code 畫面若再改版可能重現。
-- **同步 upstream**：`git fetch upstream && git rebase upstream/main`（在 `local/usage-timeout`），
-  重編後 `systemctl --user restart cc-connect`，再跑一次 §7。
+- **檢查 upstream 有沒有更新**（fork 預設分支是 `local/usage-timeout`）：
+
+  ```bash
+  cd ~/Project/cc-connect && git fetch upstream
+  git rev-list --count HEAD..upstream/main          # 0 = 沒更新
+  git log --oneline HEAD..upstream/main | head -20  # 有更新時看改了什麼
+  ```
+
+- **同步 upstream**：`git rebase upstream/main`（在 `local/usage-timeout`）→ 照 §2 重編 →
+  `systemctl --user restart cc-connect` → 跑一次 §7 → `git push --force-with-lease origin local/usage-timeout`。
