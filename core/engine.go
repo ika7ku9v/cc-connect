@@ -9124,7 +9124,7 @@ func (e *Engine) cmdUsage(p Platform, msg *Message) {
 		return
 	}
 
-	fetchCtx, cancel := context.WithTimeout(e.ctx, 10*time.Second)
+	fetchCtx, cancel := context.WithTimeout(e.ctx, 120*time.Second)
 	defer cancel()
 
 	report, err := reporter.GetUsage(fetchCtx)
