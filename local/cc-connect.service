@@ -1,0 +1,17 @@
+[Unit]
+Description=cc-connect - AI Agent Chat Bridge (Telegram -> Friday)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/bruce/.local/bin/cc-connect --config /home/bruce/.cc-connect/config.toml
+WorkingDirectory=/home/bruce/.cc-connect
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/home/bruce/.local/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="TMPDIR=/home/bruce/.cc-connect/tmp"
+Environment="TERM=xterm-256color"
+
+[Install]
+WantedBy=default.target
