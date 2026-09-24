@@ -25,7 +25,7 @@
 | commit | 內容 | 原因 |
 | :-- | :-- | :-- |
 | `c6f0fd29` | `core/engine.go` `cmdUsage` 的 timeout 10s → 120s | 抓用量常超過 10s（Pi 時代就有的改動）。`cmdModel` 兩處刻意不動 |
-| （本檔） | `local/RUNBOOK.md`、`local/cc-connect.service` | 重建文件與 unit 範本 |
+| `667b8b35`、`83201753` | `local/RUNBOOK.md`、`local/cc-connect.service`、upstream 同步說明 | 重建文件與 unit 範本（只有文件，不影響 binary） |
 
 ---
 
@@ -56,13 +56,13 @@ cd /tmp && curl -fLO https://go.dev/dl/$V.linux-amd64.tar.gz \
 cd ~/Project
 git clone git@github.com:ika7ku9v/cc-connect.git && cd cc-connect
 git remote add upstream https://github.com/chenhg5/cc-connect.git
-git switch local/usage-timeout
+git switch local/usage-timeout   # fork 的預設分支就是這支，clone 完通常已經在上面
 
 export PATH=$PATH:/usr/local/go/bin
 go build -tags 'no_web goolm' \
   -ldflags "-s -w -X main.version=$(sed -n 's/^VERSION := //p' Makefile) -X main.commit=$(git rev-parse --short HEAD) -X main.buildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   -o ~/.local/bin/cc-connect ./cmd/cc-connect
-cc-connect --version        # commit 要是 local/usage-timeout 的 HEAD
+cc-connect --version        # commit 要 >= c6f0fd29；之後只改 local/ 文件的 commit 不用重編
 ```
 
 - `no_web`：不編 web 管理介面（config 的 `[management] port = 0`，沒在用）。
@@ -87,7 +87,8 @@ S=$(mktemp -d) && tailscale file get $S && tar xzf $S/cc-connect-conf.tgz -C $S
 install -d -m 700 ~/.cc-connect ~/.cc-connect/tmp
 sed "s#work_dir = \".*\"#work_dir = \"$HOME/Project/Friday-Agent\"#" $S/.cc-connect/config.toml > ~/.cc-connect/config.toml
 chmod 600 ~/.cc-connect/config.toml
-grep -n 'work_dir\|/media\|/home/' ~/.cc-connect/config.toml   # 確認沒有舊機器路徑
+grep -nE '/media/bbclaw|/home/bbclaw' ~/.cc-connect/config.toml || echo OK   # 沒有舊機器路徑
+grep -n work_dir ~/.cc-connect/config.toml                                 # 要是這台的 Friday-Agent
 rm -rf $S
 ```
 
