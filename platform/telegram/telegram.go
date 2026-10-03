@@ -1206,6 +1206,12 @@ func shouldFallbackRichMessage(err error) bool {
 	if err == nil {
 		return false
 	}
+	// HTTP 400 is deterministic: retrying the same rich payload fails again, while the
+	// legacy HTML path may still deliver the reply. Without this, a 400 whose description
+	// is not in the marker list drops the reply entirely.
+	if errors.Is(err, tgbot.ErrorBadRequest) {
+		return true
+	}
 	message := strings.ToLower(err.Error())
 	for _, marker := range []string{
 		"can't parse",
