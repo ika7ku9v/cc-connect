@@ -27,6 +27,31 @@
 | `c6f0fd29` | `core/engine.go` `cmdUsage` 的 timeout 10s → 120s | 抓用量常超過 10s（Pi 時代就有的改動）。`cmdModel` 兩處刻意不動 |
 | `667b8b35`、`83201753` | `local/RUNBOOK.md`、`local/cc-connect.service`、upstream 同步說明 | 重建文件與 unit 範本（只有文件，不影響 binary） |
 
+### 分支 `local/rich-messages`（2026-10-03 起 Pi 當班的版本）
+
+= `local/usage-timeout` ＋ Telegram Rich Messages（Bot API 10.1 原生表格）：
+
+| commit | 內容 | 原因 |
+| :-- | :-- | :-- |
+| `2584a3ef` | merge 上游 PR #1596（未 merge）；`go-telegram/bot` v1.20.0 → v1.22.0，go.sum 以 `go mod tidy` 重建 | Rich Messages 支援 |
+| `db9418e1` | `sendRichMessage` 回任何 HTTP 400 都退回舊 HTML（附測試） | PR 原本只認幾個錯誤字串，其他 400 會讓回覆遺失 |
+| `0b77427d` | 還原 PR 的 `1040651f`（callback 改併發處理） | 跟 Rich 無關、有競態疑慮；維持依序處理 |
+
+設定（`~/.cc-connect/config.toml`）：
+
+```toml
+[projects.platforms.options]   # telegram 那一段
+  rich_messages = true
+
+[stream_preview]
+  disabled_platforms = ["telegram"]   # 串流預覽走 editMessageText 舊格式；不關的話一般回覆不會走 Rich
+```
+
+- 走 Rich 的：一輪最後的回覆、`cc-connect send --message`、主動推播。選項按鈕訊息仍走舊路徑（PR 設計）
+- 編譯：Pi（aarch64）用 Go 1.27.1（官方 tarball 裝在 `~/.local/go`，`go.mod` 最低 1.25），指令同 §2，約 7 分鐘
+- 部署／還原腳本在 `local/deploy-rich/`（複製到 `~/.cc-connect/` 使用）：分階段換執行檔／改設定，先備份並 sha256 核對，重啟後 180 秒看門狗（active＋`telegram: connected`＋無 telegram ERROR），不過就自動還原並推 TG。實跑紀錄見 Friday-Agent `000_Agent/memory/daily/2026-10-03.md`
+- 已知：選項題「前面」的說明文字送不到，原因在 Claude 端（transcript 沒有 text 區塊），不是 cc-connect；要先看的說明用 `cc-connect send` 送
+
 ---
 
 ## 1. 前置（需要 sudo 的只有這段）
