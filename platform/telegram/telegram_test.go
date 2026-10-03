@@ -643,6 +643,21 @@ func TestSendRichMessagesFallsBackForDeterministicAPIError(t *testing.T) {
 	}
 }
 
+// Any HTTP 400 from sendRichMessage is deterministic (the same request will fail again),
+// so the reply must go out via the legacy path instead of being dropped, even when the
+// description is not one of the known markers.
+func TestSendRichMessagesFallsBackForAnyBadRequest(t *testing.T) {
+	p, bot := newConnectedTelegramPlatform(t, true)
+	bot.sendRichErr = fmt.Errorf("%w, %s", tgbot.ErrorBadRequest, "Bad Request: RICH_TABLE_TOO_WIDE")
+
+	if err := p.Send(context.Background(), replyContext{chatID: 123}, "**hello**"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if got := len(bot.SendMessageArgs()); got != 1 {
+		t.Fatalf("legacy SendMessage calls = %d, want 1", got)
+	}
+}
+
 func TestSendRichMessagesDoesNotFallbackForTransientError(t *testing.T) {
 	p, bot := newConnectedTelegramPlatform(t, true)
 	bot.sendRichErr = context.DeadlineExceeded
