@@ -199,3 +199,4 @@ journalctl --user -u cc-connect -f      # 等到 "telegram: connected"、"platfo
 
 - **同步 upstream**：`git rebase upstream/main`（在 `local/usage-timeout`）→ 照 §2 重編 →
   `systemctl --user restart cc-connect` → 跑一次 §7 → `git push --force-with-lease origin local/usage-timeout`。
+- **2026-11-07 實際做法（bruce-desktop）**：不在正式目錄 rebase、不 force push → `git worktree add -b <新分支> /tmp/wt-… HEAD` → 在 worktree `git rebase upstream/main` → 編到 `~/.cc-connect/deploy/cc-connect.<版>-<commit>` → `go test ./platform/telegram/... ./agent/claudecode/... ./core/...` → Friday skill `service-deploy`（plan 檔 `~/.cc-connect/deploy/cc-connect.up17.plan.sh`，bin 階段＋看門狗）→ 老布手機驗收 §7 → push 新分支 → 正式目錄切到新分支。這次：`local/rich-v152-up17`（`9f416227`）＝ upstream `b3a7bed8` ＋ 9 個本地 commit，rebase 無衝突。
