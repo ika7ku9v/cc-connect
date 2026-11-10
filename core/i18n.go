@@ -207,6 +207,7 @@ const (
 	MsgSessionCancelled          MsgKey = "session_cancelled"
 	MsgNoExecution               MsgKey = "no_execution"
 	MsgPreviousProcessing        MsgKey = "previous_processing"
+	MsgScheduledJobFailed        MsgKey = "scheduled_job_failed"
 	MsgQueueFull                 MsgKey = "queue_full"
 	MsgMessageQueued             MsgKey = "message_queued"
 	MsgNoToolsAllowed            MsgKey = "no_tools_allowed"
@@ -795,6 +796,13 @@ var messages = map[MsgKey]map[Language]string{
 		LangTraditionalChinese: "沒有正在執行的任務。",
 		LangJapanese:           "実行中のタスクはありません。",
 		LangSpanish:            "No hay ejecución en progreso.",
+	},
+	MsgScheduledJobFailed: {
+		LangEnglish:            "⚠️ Scheduled task \"%s\" (id %s) did not complete: %v",
+		LangChinese:            "⚠️ 定时任务「%s」（id %s）没有执行完成：%v",
+		LangTraditionalChinese: "⚠️ 排程「%s」（id %s）沒有執行完成：%v",
+		LangJapanese:           "⚠️ スケジュールタスク「%s」（id %s）が完了しませんでした：%v",
+		LangSpanish:            "⚠️ La tarea programada \"%s\" (id %s) no se completó: %v",
 	},
 	MsgPreviousProcessing: {
 		LangEnglish:            "⏳ Previous request still processing. Use `/ps <message>` to send a P.S. to the running task.",
