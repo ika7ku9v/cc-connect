@@ -429,6 +429,9 @@ func (ts *TimerScheduler) executeJob(jobID string) {
 
 	if err != nil {
 		slog.Error("timer: job failed", "id", jobID, "error", err)
+		if !job.Mute {
+			engine.notifyScheduledJobFailure(job.SessionKey, jobID, scheduledJobLabel(job.Description, job.Prompt, job.Exec), err)
+		}
 	} else {
 		slog.Info("timer: job completed", "id", jobID)
 	}
