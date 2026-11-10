@@ -884,6 +884,9 @@ func (cs *CronScheduler) runJob(job *CronJob, manual bool) {
 
 	if err != nil {
 		slog.Error("cron: job failed", "id", job.ID, "manual", manual, "error", err)
+		if !job.Mute {
+			engine.notifyScheduledJobFailure(job.SessionKey, job.ID, scheduledJobLabel(job.Description, job.Prompt, job.Exec), err)
+		}
 	} else {
 		slog.Info("cron: job completed", "id", job.ID, "manual", manual)
 	}

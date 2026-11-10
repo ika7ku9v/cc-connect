@@ -1503,6 +1503,48 @@ func (e *Engine) ActiveSessionKeys() []string {
 // ExecuteCronJob runs a cron job by injecting a synthetic message into the engine.
 // It finds the platform that owns the session key, reconstructs a reply context,
 // and processes the message as if the user sent it.
+// T54（老布 fork，2026-11-10）：reuse 模式的 cron／timer 碰到使用者正在對話的
+// session，原本 TryLock 失敗就直接回 busy（只寫 log），排程等於靜默消失。
+// 改成先等鎖：照 GitHub Actions concurrency 的 pending 概念等前一輪結束，
+// 並照 Kubernetes CronJob startingDeadlineSeconds 設等待上限。
+// heartbeat 刻意不走這裡（設計上忙碌就跳過）。
+var (
+	sessionBusyPollInterval = 2 * time.Second
+	sessionBusyWaitCap      = 15 * time.Minute
+)
+
+// busyWaitLimit 回傳排程最多等鎖多久：不超過 sessionBusyWaitCap，且只用掉
+// 排程逾時的一半，讓等到鎖之後還有時間跑完（外層 timeout 到了只會回報失敗，
+// 背景 goroutine 仍會繼續跑，等太久會變成「回報失敗但其實之後跑了」）。
+func busyWaitLimit(timeout time.Duration) time.Duration {
+	limit := sessionBusyWaitCap
+	if timeout > 0 && timeout/2 < limit {
+		limit = timeout / 2
+	}
+	return limit
+}
+
+// waitSessionLock 先 TryLock，失敗就每 sessionBusyPollInterval 重試，直到拿到鎖或超過 maxWait。
+func waitSessionLock(s *Session, sessionKey string, maxWait time.Duration) (uint64, bool) {
+	if gen, ok := s.TryLock(); ok {
+		return gen, true
+	}
+	slog.Info("scheduled job: session busy, waiting for lock", "session", sessionKey, "max_wait", maxWait)
+	deadline := time.Now().Add(maxWait)
+	for time.Now().Before(deadline) {
+		wait := sessionBusyPollInterval
+		if remaining := time.Until(deadline); remaining < wait {
+			wait = remaining
+		}
+		time.Sleep(wait)
+		if gen, ok := s.TryLock(); ok {
+			slog.Info("scheduled job: session lock acquired after waiting", "session", sessionKey)
+			return gen, true
+		}
+	}
+	return 0, false
+}
+
 func (e *Engine) ExecuteCronJob(job *CronJob) error {
 	e.hooks.Emit(HookEvent{
 		Event:      HookEventCronTriggered,
@@ -1694,9 +1736,10 @@ func (e *Engine) ExecuteCronJob(job *CronJob) error {
 	}
 
 	session := sessions.GetOrCreateActive(sessionKey)
-	lockGen, locked := session.TryLock()
+	maxWait := busyWaitLimit(job.ExecutionTimeout())
+	lockGen, locked := waitSessionLock(session, sessionKey, maxWait)
 	if !locked {
-		return fmt.Errorf("session %q is busy", sessionKey)
+		return fmt.Errorf("session %q is busy (waited %s)", sessionKey, maxWait)
 	}
 
 	iKey := sessionKey
@@ -1890,9 +1933,10 @@ func (e *Engine) ExecuteTimerJob(job *TimerJob) error {
 	}
 
 	session := sessions.GetOrCreateActive(sessionKey)
-	lockGen, locked := session.TryLock()
+	maxWait := busyWaitLimit(job.ExecutionTimeout())
+	lockGen, locked := waitSessionLock(session, sessionKey, maxWait)
 	if !locked {
-		return fmt.Errorf("session %q is busy", sessionKey)
+		return fmt.Errorf("session %q is busy (waited %s)", sessionKey, maxWait)
 	}
 
 	iKey := sessionKey
