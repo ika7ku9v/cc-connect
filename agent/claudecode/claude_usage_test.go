@@ -31,6 +31,36 @@ func TestSanitizeClaudeUsageOutput_RendersCursorMoves(t *testing.T) {
 	}
 }
 
+// Claude Code v2.1.316 lays out the /usage panel with CHA (ESC[<n>G) instead
+// of literal spaces. Captured from a real probe on 2026-11-23.
+func TestClaudeUsageTerminal_CursorHorizontalAbsolute(t *testing.T) {
+	raw := "" +
+		"\x1b[3G\x1b[1mCurrent\x1b[11Gsession\x1b[22m\r\r\n" +
+		"\x1b[3G\x1b[48;5;102m\x1b[38;5;153m████                                              \x1b[54G\x1b[39m\x1b[49m8%\x1b[57Gused\r\r\n" +
+		"\x1b[3G\x1b[38;5;246mResets\x1b[10G6:50pm\x1b[17G(Asia/Taipei)\x1b[39m\r\r\n" +
+		"\r\r\n" +
+		"\x1b[3G\x1b[1mCurrent\x1b[11Gweek\x1b[16G(all\x1b[21Gmodels)\x1b[22m\r\r\n" +
+		"\x1b[3G\x1b[48;5;102m\x1b[38;5;153m█████████████                                     \x1b[54G\x1b[39m\x1b[49m26%\x1b[58Gused\r\r\n" +
+		"\x1b[3G\x1b[38;5;246mResets\x1b[10GNov\x1b[14G24,\x1b[18G3am\x1b[22G(Asia/Taipei)\x1b[39m\r\r\n"
+
+	terminal := newClaudeUsageTerminal()
+	terminal.Write([]byte(raw))
+	screen := normalizeClaudeUsageText(terminal.String())
+	if !usageReady(screen) {
+		t.Fatalf("usageReady = false for CHA-laid-out panel: %q", screen)
+	}
+
+	loc := mustLoadLocation(t, "Asia/Taipei")
+	report, err := parseClaudeUsageReport(screen, time.Date(2026, time.November, 23, 14, 40, 0, 0, loc))
+	if err != nil {
+		t.Fatalf("parseClaudeUsageReport returned error: %v (screen %q)", err, screen)
+	}
+	windows := report.Buckets[0].Windows
+	if len(windows) != 2 || windows[0].UsedPercent != 8 || windows[1].UsedPercent != 26 {
+		t.Fatalf("windows = %+v, want session 8%% and week 26%%", windows)
+	}
+}
+
 func TestParseClaudeUsageReport_Success(t *testing.T) {
 	loc := mustLoadLocation(t, "Asia/Seoul")
 	now := time.Date(2026, time.December, 22, 12, 0, 0, 0, loc)

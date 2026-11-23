@@ -602,6 +602,10 @@ func (t *claudeUsageTerminal) applyCSI(params string, final byte) {
 				t.col = 0
 			}
 		}
+	case 'G':
+		// CHA: cursor to absolute column (1-based). Claude Code uses it in
+		// place of literal spaces when laying out the /usage panel.
+		t.col = parseCSIInt(params, 1) - 1
 	case 'H', 'f':
 		row, col := parseCSICursor(params)
 		if row < 0 {
