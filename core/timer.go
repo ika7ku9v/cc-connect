@@ -25,7 +25,7 @@ type TimerJob struct {
 	Description string    `json:"description"`
 	Silent      *bool     `json:"silent,omitempty"`       // suppress start notification; nil = use global default
 	Mute        bool      `json:"mute,omitempty"`         // suppress ALL messages (start + result)
-	SessionMode string    `json:"session_mode,omitempty"` // "" or "reuse" = share active session; "new_per_run" = fresh session each run
+	SessionMode string    `json:"session_mode,omitempty"` // "" or "reuse" = share active session; "new_per_run" = fresh session each run; "new_active" = replace the active session (like /new) then run
 	Mode        string    `json:"mode,omitempty"`         // permission mode override; "" = use project default
 	TimeoutMins *int      `json:"timeout_mins,omitempty"` // nil = default 30m; 0 = no limit; >0 = minutes
 	CreatedAt   time.Time `json:"created_at"`
@@ -52,9 +52,25 @@ func (j *TimerJob) ExecutionTimeout() time.Duration {
 	return time.Duration(*j.TimeoutMins) * time.Minute
 }
 
+// NormalizeTimerSessionMode accepts the cron modes plus "new_active"
+// ("new-active"), which only timers support.
+func NormalizeTimerSessionMode(s string) string {
+	if s == "new_active" || s == "new-active" {
+		return "new_active"
+	}
+	return NormalizeCronSessionMode(s)
+}
+
 // UsesNewSessionPerRun reports whether the timer should use a new engine session.
 func (j *TimerJob) UsesNewSessionPerRun() bool {
-	return NormalizeCronSessionMode(j.SessionMode) == "new_per_run"
+	return NormalizeTimerSessionMode(j.SessionMode) == "new_per_run"
+}
+
+// UsesNewActiveSession reports whether the timer should wait for the active
+// session to go idle, reset it like /new, and run the prompt in a fresh active
+// session that later user messages also reach.
+func (j *TimerJob) UsesNewActiveSession() bool {
+	return NormalizeTimerSessionMode(j.SessionMode) == "new_active"
 }
 
 func validateTimerJob(j *TimerJob) error {
@@ -70,9 +86,9 @@ func validateTimerJob(j *TimerJob) error {
 	if j.Prompt != "" && j.Exec != "" {
 		return fmt.Errorf("prompt and exec are mutually exclusive")
 	}
-	mode := NormalizeCronSessionMode(j.SessionMode)
-	if mode != "" && mode != "new_per_run" {
-		return fmt.Errorf("invalid session_mode %q (want reuse, new_per_run, or new-per-run)", j.SessionMode)
+	mode := NormalizeTimerSessionMode(j.SessionMode)
+	if mode != "" && mode != "reuse" && mode != "new_per_run" && mode != "new_active" {
+		return fmt.Errorf("invalid session_mode %q (want reuse, new_per_run, new-per-run, new_active, or new-active)", j.SessionMode)
 	}
 	if j.Mode != "" {
 		switch j.Mode {
