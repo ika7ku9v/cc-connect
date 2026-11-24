@@ -2013,17 +2013,25 @@ func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Mess
 	e.cleanupInteractiveState(iKey)
 	old.SetAgentSessionID("", "")
 	old.ClearHistory()
-	old.UnlockWithoutUpdate(oldGen)
 
+	// Create and lock the new session before it becomes active, so a user
+	// message arriving in between cannot grab it first.
 	name := job.Description
 	if name == "" {
 		name = "handoff-" + job.ID
 	}
-	session := sessions.NewSession(sessionKey, name)
-	lockGen, locked := waitSessionLock(session, sessionKey, maxWait)
+	session := sessions.NewSideSession(sessionKey, name)
+	lockGen, locked := session.TryLock()
 	if !locked {
-		return fmt.Errorf("new session %q is busy (waited %s)", session.ID, maxWait)
+		old.UnlockWithoutUpdate(oldGen)
+		return fmt.Errorf("new session %q could not be locked", session.ID)
 	}
+	if _, err := sessions.SwitchSession(sessionKey, session.ID); err != nil {
+		session.UnlockWithoutUpdate(lockGen)
+		old.UnlockWithoutUpdate(oldGen)
+		return fmt.Errorf("switch to new session %q: %w", session.ID, err)
+	}
+	old.UnlockWithoutUpdate(oldGen)
 	slog.Info("timer new_active: running prompt in new session", "session_key", sessionKey, "new_session", session.ID, "job", job.ID)
 	e.processInteractiveMessageWith(p, msg, session, agent, sessions, iKey, workspaceDir, sessionKey, lockGen)
 	return nil
