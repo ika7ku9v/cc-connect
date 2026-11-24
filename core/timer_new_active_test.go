@@ -61,9 +61,32 @@ func TestTimerNewActiveReplacesActiveSession(t *testing.T) {
 	if len(as.sentPrompts) != 1 || !strings.Contains(as.sentPrompts[0], "read handoff") {
 		t.Fatalf("agent prompts = %q, want exactly the handoff prompt", as.sentPrompts)
 	}
-	if got := e.sessions.GetOrCreateActive(key).HistoryLen(); got < 1 {
+	cur := e.sessions.GetOrCreateActive(key)
+	if got := cur.HistoryLen(); got < 1 {
 		t.Errorf("new active session has no history, prompt did not run in it (len=%d)", got)
 	}
+	if cur.Busy() || old.Busy() {
+		t.Errorf("locks must be released after the run: new busy=%v old busy=%v", cur.Busy(), old.Busy())
+	}
+}
+
+func TestTimerNewActiveBusyFailureNotifiesChat(t *testing.T) {
+	withBusyWait(t, 20*time.Millisecond, 100*time.Millisecond)
+	e, p, _ := newBusyTestEngine(t)
+	key := "test:user1"
+	seedOldSession(e, key)
+	holdSession(e, key, 0)
+
+	runTimerThroughScheduler(t, e, &TimerJob{ID: "h4", Project: "test", SessionKey: key,
+		Prompt: "continue", Description: "接力測試", SessionMode: "new-active",
+		ScheduledAt: time.Now(), CreatedAt: time.Now()})
+
+	for _, s := range p.getSent() {
+		if strings.Contains(s, "接力測試") && strings.Contains(s, "h4") {
+			return
+		}
+	}
+	t.Fatalf("want a failure notice naming the handoff job, sent=%q", p.getSent())
 }
 
 func TestTimerNewActiveWaitsForBusyOldSession(t *testing.T) {

@@ -2009,13 +2009,9 @@ func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Mess
 	if workspaceDir != "" {
 		iKey = workspaceDir + ":" + sessionKey
 	}
-	slog.Info("timer new_active: resetting active session", "session_key", sessionKey, "old_session", old.ID, "job", job.ID)
-	e.cleanupInteractiveState(iKey)
-	old.SetAgentSessionID("", "")
-	old.ClearHistory()
-
 	// Create and lock the new session before it becomes active, so a user
-	// message arriving in between cannot grab it first.
+	// message arriving in between cannot grab it first. The old session is
+	// only reset after the switch succeeds.
 	name := job.Description
 	if name == "" {
 		name = "handoff-" + job.ID
@@ -2031,6 +2027,10 @@ func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Mess
 		old.UnlockWithoutUpdate(oldGen)
 		return fmt.Errorf("switch to new session %q: %w", session.ID, err)
 	}
+	slog.Info("timer new_active: resetting old session", "session_key", sessionKey, "old_session", old.ID, "new_session", session.ID, "job", job.ID)
+	e.cleanupInteractiveState(iKey)
+	old.SetAgentSessionID("", "")
+	old.ClearHistory()
 	old.UnlockWithoutUpdate(oldGen)
 	slog.Info("timer new_active: running prompt in new session", "session_key", sessionKey, "new_session", session.ID, "job", job.ID)
 	e.processInteractiveMessageWith(p, msg, session, agent, sessions, iKey, workspaceDir, sessionKey, lockGen)
