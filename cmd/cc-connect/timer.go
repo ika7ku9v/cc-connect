@@ -412,7 +412,9 @@ Options:
       --prompt <text>        Task prompt (runs through agent)
       --exec <command>       Shell command (runs directly, mutually exclusive with --prompt)
       --desc <text>          Short description
-      --session-mode <mode>  reuse (default) or new-per-run
+      --session-mode <mode>  reuse (default), new-per-run, or new-active
+                             (new-active: wait for the chat to go idle, start a
+                             new session like /new, run the prompt there)
       --timeout-mins <n>     Max minutes to wait per run (0 = no limit; default 30)
       --mute                 Suppress all messages (start + result)
       --data-dir <path>      Data directory (default: ~/.cc-connect)

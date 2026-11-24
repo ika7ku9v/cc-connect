@@ -1951,6 +1951,10 @@ func (e *Engine) ExecuteTimerJob(job *TimerJob) error {
 	}
 	msg.Content = content
 
+	if job.UsesNewActiveSession() {
+		return e.runTimerInNewActiveSession(job, effectivePlatform, msg, agent, sessions, workspaceDir, sessionKey)
+	}
+
 	useNewSession := false
 	if e.timerScheduler != nil {
 		useNewSession = e.timerScheduler.UsesNewSession(job)
@@ -1986,6 +1990,42 @@ func (e *Engine) ExecuteTimerJob(job *TimerJob) error {
 		iKey = workspaceDir + ":" + sessionKey
 	}
 	e.processInteractiveMessageWith(effectivePlatform, msg, session, agent, sessions, iKey, workspaceDir, sessionKey, lockGen)
+	return nil
+}
+
+// runTimerInNewActiveSession handles session_mode=new_active: wait until the
+// active session is idle, reset it the same way /new does, then run the prompt
+// as the first message of a fresh active session. If the old session never
+// frees up, nothing is reset and a busy error is returned.
+func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Message, agent Agent, sessions *SessionManager, workspaceDir, sessionKey string) error {
+	maxWait := busyWaitLimit(job.ExecutionTimeout())
+	old := sessions.GetOrCreateActive(sessionKey)
+	oldGen, locked := waitSessionLock(old, sessionKey, maxWait)
+	if !locked {
+		return fmt.Errorf("session %q is busy (waited %s)", sessionKey, maxWait)
+	}
+
+	iKey := sessionKey
+	if workspaceDir != "" {
+		iKey = workspaceDir + ":" + sessionKey
+	}
+	slog.Info("timer new_active: resetting active session", "session_key", sessionKey, "old_session", old.ID, "job", job.ID)
+	e.cleanupInteractiveState(iKey)
+	old.SetAgentSessionID("", "")
+	old.ClearHistory()
+	old.UnlockWithoutUpdate(oldGen)
+
+	name := job.Description
+	if name == "" {
+		name = "handoff-" + job.ID
+	}
+	session := sessions.NewSession(sessionKey, name)
+	lockGen, locked := waitSessionLock(session, sessionKey, maxWait)
+	if !locked {
+		return fmt.Errorf("new session %q is busy (waited %s)", session.ID, maxWait)
+	}
+	slog.Info("timer new_active: running prompt in new session", "session_key", sessionKey, "new_session", session.ID, "job", job.ID)
+	e.processInteractiveMessageWith(p, msg, session, agent, sessions, iKey, workspaceDir, sessionKey, lockGen)
 	return nil
 }
 

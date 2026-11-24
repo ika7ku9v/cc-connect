@@ -4518,7 +4518,8 @@ Environment variables CC_PROJECT and CC_SESSION_KEY are already set.
 Optional flags:
   --exec <command>          run a shell command directly instead of --prompt
   --desc <text>             short description
-  --session-mode <mode>     reuse (default) or new-per-run (fresh session each run)
+  --session-mode <mode>     reuse (default), new-per-run (fresh side session each run),
+                            or new-active (wait for idle, replace the chat session like /new, run prompt there)
   --timeout-mins <n>        max wait per run in minutes (default 30, 0 = unlimited)
   --mute                    suppress all messages (start notification + result)
 
@@ -4548,7 +4549,8 @@ You can also list or cancel timers:
 可选参数:
   --exec <command>          直接跑 shell 命令而不是 --prompt
   --desc <text>             简短描述
-  --session-mode <mode>     reuse(默认)或 new-per-run(每次跑用新会话)
+  --session-mode <mode>     reuse(默认)、new-per-run(每次跑用新的旁支会话)
+                            或 new-active(等空闲后像 /new 一样换掉当前会话，在新会话里跑)
   --timeout-mins <n>        每次最长等待分钟数(默认 30,0 = 不限)
   --mute                    静默所有消息(开始通知和结果)
 
