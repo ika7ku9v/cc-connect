@@ -2019,11 +2019,13 @@ func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Mess
 	session := sessions.NewSideSession(sessionKey, name)
 	lockGen, locked := session.TryLock()
 	if !locked {
+		sessions.DeleteByID(session.ID)
 		old.UnlockWithoutUpdate(oldGen)
 		return fmt.Errorf("new session %q could not be locked", session.ID)
 	}
 	if _, err := sessions.SwitchSession(sessionKey, session.ID); err != nil {
 		session.UnlockWithoutUpdate(lockGen)
+		sessions.DeleteByID(session.ID)
 		old.UnlockWithoutUpdate(oldGen)
 		return fmt.Errorf("switch to new session %q: %w", session.ID, err)
 	}
@@ -2031,6 +2033,7 @@ func (e *Engine) runTimerInNewActiveSession(job *TimerJob, p Platform, msg *Mess
 	e.cleanupInteractiveState(iKey)
 	old.SetAgentSessionID("", "")
 	old.ClearHistory()
+	sessions.Save()
 	old.UnlockWithoutUpdate(oldGen)
 	slog.Info("timer new_active: running prompt in new session", "session_key", sessionKey, "new_session", session.ID, "job", job.ID)
 	e.processInteractiveMessageWith(p, msg, session, agent, sessions, iKey, workspaceDir, sessionKey, lockGen)
