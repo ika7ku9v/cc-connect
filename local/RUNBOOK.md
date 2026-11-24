@@ -52,6 +52,15 @@
 - 部署／還原腳本在 `local/deploy-rich/`（複製到 `~/.cc-connect/` 使用）：分階段換執行檔／改設定，先備份並 sha256 核對，重啟後 180 秒看門狗（active＋`telegram: connected`＋無 telegram ERROR），不過就自動還原並推 TG。實跑紀錄見 Friday-Agent `000_Agent/memory/daily/2026-10-03.md`
 - 已知：選項題「前面」的說明文字送不到，原因在 Claude 端（transcript 沒有 text 區塊），不是 cc-connect；要先看的說明用 `cc-connect send` 送
 
+### 分支 `local/handoff-new-active`（2026-11-24 起 bruce-desktop 當班）
+
+= `local/rich-up18`（`693195a0`）＋ timer 的 `session_mode new_active`（Friday skill `handoff` 自動接力用）：
+
+| commit | 內容 | 原因 |
+| :-- | :-- | :-- |
+| `d4223dd2` | `core/timer.go` 接受 `new_active`（`new-active` 也認）；`core/engine.go` `runTimerInNewActiveSession`：等舊 session 閒置 → 建新 session 並鎖住 → 切成 active → 清舊 session 的互動狀態與 agent ID → 在新 session 跑 prompt；cron 仍拒絕這個模式 | context 快滿時 agent 自己排 timer 換新 session 接力，不用老布手動 `/new` |
+| `72aa2834`、`3d4adfac`、`544a1769` | 先鎖新 session 再切換（避免使用者訊息搶先）、切換成功後才清舊 session、清完 `Save()`、失敗時刪掉旁支 session | xreview 審查查證後採納的修正 |
+
 ---
 
 ## 1. 前置（需要 sudo 的只有這段）
